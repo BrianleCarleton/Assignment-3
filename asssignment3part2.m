@@ -1,39 +1,59 @@
 clearvars; close all; clc
 set(0,'DefaultFigureWindowStyle','docked')
-nx = 100;
-ny = 50;
+nx =  20;
+ny =  10;
+Vo = 0.8;
 f = zeros(1,nx*ny);
 G = sparse(ny*nx);
 M = zeros(nx,ny);
-l = 100e-9;
-w = 200e-9;
+l = 200e-9;
+w = 100e-9;
 sigma = ones(nx,ny);
-xx = linspace(0,l,nx);
-yy = linspace(0,w,ny);
 T = 300;
 q = 1.602e-19;
-n_elec = 1*10e13;
+n_elec = 1e19; %m^-2 = 1e15 cm^-2   (per cm squared)
 kb = 1.38064852*10^-23;
 kt = 1.38064852*10^-23*T;
 m = (9.10938356*10^-31)*0.26;
 vth = sqrt(2*kt/m);
-width = 200e-9;
-height = 100e-9;
-numberofelectrons = 1000;
+numberofelectrons = 50;
 xp = zeros(numberofelectrons,1);
-x = (width).*rand(numberofelectrons,1);
-y = (0.55e-7-0.45e-7).*rand(numberofelectrons,1)+0.45e-7;
+X = rand(numberofelectrons,1)*l;
+Y = rand(numberofelectrons,1)*w;
 yp = zeros(numberofelectrons,1);
-Nt = 1000;
+Nt = 300;
 tmn = 0.2e-12;
-dt = (1/200)*(width/vth) ;
-sample = randi(numberofelectrons,numberofelectrons,1);
-  
+dt = (1/200)*(l/vth);
+x = linspace(0,l,nx);
+y = linspace(0,w,ny);
+dx = l/(nx-1);
+dy = w/(ny-1);
+
+
+boxes = {};
+boxes{1}.X = [0.8 0.4]*1e-7;
+boxes{1}.Y = [0.6 0.4]*1e-7;
+boxes{2}.X = [0.8 0.4]*1e-7;
+boxes{2}.Y = [0 0.4]*1e-7;
+
+
+
+it = (X < 1.2e-7) & (X > 0.8e-7) & (Y > 0.6e-7);
+ib = (X < 1.2e-7) & (X > 0.8e-7) & (Y < 0.4e-7);
+iXY = it | ib;
+while(sum(iXY) > 0)
+    X(iXY) = rand(1,sum(iXY))*l;
+    Y(iXY) = rand(1,sum(iXY))*w;
+    it = X < 1.2e-7 & X > 0.8e-7 & Y > 0.6e-7;
+    ib = X < 1.2e-7 & X > 0.8e-7 & Y < 0.4e-7;
+    iXY = it | ib;
+end
+
 
 
 for i = 1:nx
    for j = 1:ny
-    if xx(i)> l*0.3 & xx(i)< l*0.65 & (yy(j)< w*0.3 | yy(j)> w*0.6)
+    if x(i)> l*0.3 & x(i)< l*0.65 & (y(j)< w*0.3 | y(j)> w*0.6)
         sigma(i,j) = 10e-2;
     end
    end
@@ -42,33 +62,33 @@ end
     
 
 for i = 1:nx 
-        for j = 1:ny
+     for j = 1:ny
         n = j +(i-1)*ny;
         nxm = j + (i-2)*ny;
         nxp = j + (i)*ny;
         nyp = (j+1) + (i-1)*ny; 
         nym = (j-1) +(i-1)*ny;
         
-            if i == 1
+        if i == 1
             G(n,n) = sigma(i,j);
-            f(n) = 1;
+            f(n) = Vo;
             
-            elseif i == nx
+        elseif i == nx
             G(n,n) = sigma(i,j);   
             
-            elseif j == 1 %bottom   
+        elseif j == 1 %bottom   
             G(n,nxp) = sigma(i+1,j);
             G(n,nxm) = sigma(i-1,j);
             G(n,nyp) = sigma(i,j+1);
             G(n,n) = -(G(n,nxp)+G(n,nxm)+G(n,nyp));
             
-            elseif j == ny %top
+        elseif j == ny %top
             G(n,nxp) = sigma(i+1,j);
             G(n,nxm) = sigma(i-1,j);
             G(n,nym) = sigma(i,j-1);
             G(n,n) = -(G(n,nxp)+G(n,nxm)+G(n,nym));
           
-            else 
+        else 
             G(n,nxp) = sigma(i+1,j);
             G(n,nxm) = sigma(i-1,j);
             G(n,nym) = sigma(i,j-1);
@@ -76,7 +96,8 @@ for i = 1:nx
             G(n,n) = -(G(n,nxp)+G(n,nxm)+G(n,nym)+G(n,nyp));
             end           
         end
-    end    
+end 
+    
 V = G\f';
 
     for i = 1:nx
@@ -84,11 +105,13 @@ V = G\f';
             n = j + (i-1)*ny;
             M(i,j) = V(n);
         end
-       % surf(M,'linestyle','none')  
+       %surf(M) %,'linestyle','none')  
     end
     
-[Ex,Ey] = gradient(M);
-
+    
+[Ey,Ex] = gradient(M);
+Ex = -Ex/dx;
+Ey = -Ey/dy;
 Fx = (Ex)*(1.602e-19);
 Fy = (Ey)*(1.602e-19);
 ax = Fx/m; 
@@ -100,26 +123,22 @@ vy = randn(numberofelectrons,1) *vth/sqrt(2);
 vx_thermalized = randn(numberofelectrons,1) *vth/sqrt(2);
 vy_thermalized = randn(numberofelectrons,1) *vth/sqrt(2);
 
-boxes = {};
-boxes{1}.X = [0.8 0.4]*1e-7;
-boxes{1}.Y = [0.6 0.4]*1e-7;
-boxes{2}.X = [0.8 0.4]*1e-7;
-boxes{2}.Y = [0 0.4]*1e-7;
+
 
 %retangle(xmin ymin howwide howlong)
 for z = 1:2
 hold on
 rectangle('position',[boxes{z}.X(1), boxes{z}.Y(1),boxes{z}.X(2),boxes{z}.Y(2)])
-axis([0 width 0 height])
+axis([0 l 0 w])
 end
 
 for t =1:Nt  
     %position calculations 
-    xp = x;
-    yp = y;
+    xp = X;
+    yp = Y;
    
-    xbin = discretize(x,nx);
-    ybin = discretize(y,ny);
+    xbin = discretize(X,nx);
+    ybin = discretize(Y,ny);
     
     axp = zeros(numberofelectrons,1);
     ayp = zeros(numberofelectrons,1);
@@ -129,8 +148,8 @@ for t =1:Nt
         ayp(i) = ay(xbin(i),ybin(i));
     end
 
-    x = x + vx*dt+(1/2)*(axp)*(dt^2) ;
-    y = y + vy*dt+(1/2)*(ayp)*(dt^2)  ;
+    X = X + vx*dt+(1/2)*(axp)*(dt^2);
+    Y = Y + vy*dt+(1/2)*(ayp)*(dt^2);
     
     vx = vx + axp*dt;
     vy = vy + ayp*dt;
@@ -143,8 +162,8 @@ for t =1:Nt
       
     %Boundary conditions 
     %inside top and bottom box
-    InTopBox = x < 1.2e-7 & x > 0.8e-7 & y > 0.6e-7;
-    InBotBox = x < 1.2e-7 & x > 0.8e-7 & y < 0.4e-7;
+    InTopBox = X < 1.2e-7 & X > 0.8e-7 & Y > 0.6e-7;
+    InBotBox = X < 1.2e-7 & X > 0.8e-7 & Y < 0.4e-7;
     
     %right and left of the boxes
     reflectxtopright = xp > 1.2e-7 & yp > 0.6e-7;
@@ -162,40 +181,40 @@ for t =1:Nt
     vx(reflextxbotleft & InBotBox) = -vx(reflextxbotleft & InBotBox);
     
     %reverse x for bottom box
-    x(reflectxbotright & InBotBox) = xp(reflectxbotright & InBotBox);
-    x(reflextxbotleft & InBotBox) = xp(reflextxbotleft & InBotBox);
+    X(reflectxbotright & InBotBox) = xp(reflectxbotright & InBotBox);
+    X(reflextxbotleft & InBotBox) = xp(reflextxbotleft & InBotBox);
     
     %reverse x for top box
-    x(reflectxtopright & InTopBox) = xp(reflectxtopright & InTopBox);
-    x(reflextxtopleft & InTopBox) = xp(reflextxtopleft & InTopBox);
+    X(reflectxtopright & InTopBox) = xp(reflectxtopright & InTopBox);
+    X(reflextxtopleft & InTopBox) = xp(reflextxtopleft & InTopBox);
     
     %reverse y for top and bottom box
-    y(reflectxbotright & InBotBox) = yp(reflectxbotright & InBotBox);
-    y(reflextxbotleft & InBotBox) = yp(reflextxbotleft & InBotBox);
-    y(reflectxtopright & InTopBox) = yp(reflectxtopright & InTopBox);
-    y(reflextxtopleft & InTopBox) = yp(reflextxtopleft & InTopBox);
+    Y(reflectxbotright & InBotBox) = yp(reflectxbotright & InBotBox);
+    Y(reflextxbotleft & InBotBox) = yp(reflextxbotleft & InBotBox);
+    Y(reflectxtopright & InTopBox) = yp(reflectxtopright & InTopBox);
+    Y(reflextxtopleft & InTopBox) = yp(reflextxtopleft & InTopBox);
     
     %reverse yspeed and y for middle 
     vy(reflectmiddle & (InTopBox|InBotBox)) = -vy(reflectmiddle & (InTopBox|InBotBox));
-    y(reflectmiddle & (InTopBox|InBotBox)) = yp(reflectmiddle & (InTopBox|InBotBox));
+    Y(reflectmiddle & (InTopBox|InBotBox)) = yp(reflectmiddle & (InTopBox|InBotBox));
 
     %periodic boundary condition
-    xp(x>width) = xp(x>width)-width;
-    x(x>width) = x(x>width)-width;
-    xp(x<0) = xp(x<0)+width;
-    x(x<0) = x(x<0)+width;
+    xp(X>l) = xp(X>l)-l;
+    X(X>l) = X(X>l)-l;
+    xp(X<0) = xp(X<0)+l;
+    X(X<0) = X(X<0)+l;
      
 
    %particle hitting top and bottom
-   vy(y>height) = -vy(y>height);
-   vy(y<0) = -vy(y<0);
+   vy(Y>w) = -vy(Y>w);
+   vy(Y<0) = -vy(Y<0);
     
    
-    v_ave(t) = sum(sqrt((vx.^2)+(vy.^2)))/n;
+    v_x(t) = mean(vx);
                             % 3D: C elec/m^3 m/s = A/m^2
                             %     I = J*Area
-    Jx = q*n_elec*v_ave;   % 2D: C elec/m^2 m/s = A/m
-    I = Jx*width;           %     I = J*Width
+    Jx = q*n_elec*v_x;   % 2D: C elec/m^2 m/s = A/m
+    I = Jx*w;           %     I = J*height
     % n_particle = num of particles/L*W
     % simple example 3D:
     % n_elec = 100 elec/unit vol
@@ -205,18 +224,17 @@ for t =1:Nt
  
     %ploting 
     for i = 1:numberofelectrons
-       plot([xp(i),x(i)],[yp(i),y(i)],'Seriesindex',i)
-        hold on 
+         plot([xp(i),X(i)],[yp(i),Y(i)],'Seriesindex',i)
+          hold on 
     end
-    
-     pause(0.1)
+      pause(0.1)
 end
  
 
 
-binx = ceil(x*nx/width);   % 100nm -> bin 5
+binx = ceil(X*nx/l);   % 100nm -> bin 5
 % ->     [ 1, 4, 7, 7 .. bin_of_last_part ]
-biny = ceil(y*ny/height);
+biny = ceil(Y*ny/w);
 
 for  i=1:nx
     for j = 1:ny
@@ -241,16 +259,22 @@ end
 z = 1:1:Nt;
 figure(2)
 surf(ebox)
+view(60,30)
 title('Density')
 figure(3)
 plot(z,I)
 title('Time vs Current')
+ylabel('Current in Amperes')
+xlabel('Time Steps')
 figure(4)
-quiver(Ex,Ey)
+quiver(Ex',Ey')
 figure(5)
 surf(temperature)
+view(60,30)
 title('Temperature')
 figure(6)
-surf(M,'linestyle','none')  
+surf(M)
+view(90,5)
 figure(7)
 surf(sigma)  
+view(60,30)
